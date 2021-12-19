@@ -135,6 +135,7 @@ setkeymap(){
 		clear
 		echo "loadkeys ${keymap}"
 		loadkeys ${keymap}
+    stty sane
 		pressanykey
 	fi
 }
