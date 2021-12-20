@@ -203,6 +203,7 @@ diskpartmenu(){
 		options+=("${txtautoparts} (gpt)" "")
 		options+=("${txtautoparts} (dos)" "")
 		options+=("${txtautoparts} (gpt,bios+efi,noswap)" "")
+		options+=("${txtautoparts} (LVM on LUKS)" "")
 	fi
 	options+=("${txteditparts} (cfdisk)" "")
 	options+=("${txteditparts} (cgdisk)" "")
@@ -226,6 +227,10 @@ diskpartmenu(){
 			"${txtautoparts} (gpt,bios+efi,noswap)")
 				diskpartautoefiusb
 				nextitem="${txtautoparts} (gpt,bios+efi,noswap)"
+			;;
+			"${txtautoparts} (LVM on LUKS)")
+				diskpartautolvmonluks
+				nextitem="${txtautoparts} (LVM on LUKS)"
 			;;
 			"${txteditparts} (cfdisk)")
 				diskpartcfdisk
@@ -367,6 +372,45 @@ diskpartautoefiusb(){
 				rootdev=${device}"3"
 			fi
 			efimode="2"
+		fi
+	fi
+}
+
+diskpartautolvmonluks(){
+		device=$(selectdisk "${txtautoparts} (gpt,efi)")
+	if [ "$?" = "0" ]; then
+		if (whiptail --backtitle "${apptitle}" --title "${txtautoparts} (gpt,efi)" --yesno "${txtautopartsconfirm//%1/${device}}" --defaultno 0 0) then
+			clear
+			echo "${txtautopartclear}"
+			parted ${device} mklabel gpt
+			echo "${txtautopartcreate//%1/EFI boot}"
+			sgdisk ${device} -n=1:0:+1024M -t=1:ef00 -c=0:boot
+			echo "${txtautopartcreate//%1/Encrypted System Volume}"
+			sgdisk ${device} -n=2:0:0 -c=0:system
+      partprobe
+			cryptdevice="/dev/disk/by-partlabel/system"
+			cryptsetup luksFormat ${cryptdevice}
+			cryptsetup open ${cryptdevice} cryptsystem
+			pvdevice="/dev/mapper/cryptsystem"
+			pvcreate ${pvdevice}
+			vgname="system"
+			vgcreate ${vgname} ${pvdevice}
+			echo "${txtautopartcreate//%1/swap}"
+			swapsize=$(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')
+			swapsize=$((${swapsize}/1000))"M"
+			lvcreate -L ${swapsize} -n swap ${vgname}
+			echo "${txtautopartcreate//%1/root}"
+			lvcreate -l 100%FREE -n root ${vgname}
+			echo ""
+			pressanykey
+			if [ "${device::8}" == "/dev/nvm" ]; then
+				bootdev=${device}"p1"
+			else
+				bootdev=${device}"1"
+			fi
+			swapdev=${vgname}"-swap"
+			rootdev=${vgname}"-root"
+			efimode="1"
 		fi
 	fi
 }
