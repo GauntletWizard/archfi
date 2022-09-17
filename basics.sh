@@ -40,12 +40,17 @@ EOF
 
 grub-mkimage --format=x86_64-efi -p "" -o foo.grub -c grub.embed.cfg
 
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
+# Grub installs it's modules and expects it's config in /boot, even though the EFI directory is /boot/efi
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB  ## --boot-directory=/boot
 cp foo.grub /boot/efi/EFI/GRUB/grubx64.efi
 # Check that it's configured and installed
 efibootmgr
-ZPOOL_VDEV_NAME_PATH=YES grub-mkconfig -o /boot/efi/grub/grub.cfg
+ZPOOL_VDEV_NAME_PATH=YES grub-mkconfig -o /boot/grub/grub.cfg
 
+mkinitcpio -P
+
+# Before rebooting, update the system and install all my deps:
+pacman -S - < installed.toph
 
 # Yay, my preferred tool for interacting with AUR/Replacing pacman
 # Install deps for yay
